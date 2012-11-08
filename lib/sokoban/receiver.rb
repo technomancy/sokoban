@@ -24,10 +24,8 @@ module Sokoban
        ["GET", 'get_idx_file',     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    DEFAULTS = { :project_root => `pwd` }
-
-    def initialize(config = false)
-      @config = DEFAULTS.merge(config || {})
+    def initialize(repo_dir)
+      @git_dir = repo_dir
     end
 
     def call(env)
@@ -39,9 +37,7 @@ module Sokoban
       return render_method_not_allowed if cmd == :not_allowed
       return render_not_found if !cmd
 
-      @dir = get_git_dir or return render_not_found
-
-      Dir.chdir(@dir) do
+      Dir.chdir(@git_dir) do
         self.send(cmd.to_sym)
       end
     end
@@ -58,7 +54,7 @@ module Sokoban
       @res.status = 200
       @res["Content-Type"] = "application/x-git-%s-result" % @rpc
       @res.finish do
-        command = git_command("#{@rpc} --stateless-rpc #{@dir}")
+        command = "git #{@rpc} --stateless-rpc #{@git_dir}"
         IO.popen(command, File::RDWR) do |pipe|
           pipe.write(input)
           while !pipe.eof?
@@ -73,8 +69,7 @@ module Sokoban
       service_name = get_service_type
 
       if has_access?(service_name)
-        cmd = git_command("#{service_name} --stateless-rpc --advertise-refs .")
-        refs = `#{cmd}`
+        refs = `git #{service_name} --stateless-rpc --advertise-refs .`
 
         @res = Rack::Response.new
         @res.status = 200
@@ -135,7 +130,7 @@ module Sokoban
 
     # some of this borrowed from the Rack::File implementation
     def send_file(reqfile, content_type)
-      reqfile = File.join(@dir, reqfile)
+      reqfile = File.join(@git_dir, reqfile)
       return render_not_found if !F.exists?(reqfile)
 
       @res = Rack::Response.new
@@ -160,13 +155,6 @@ module Sokoban
         @res["Content-Length"] = size
         @res.write body
         @res.finish
-      end
-    end
-
-    def get_git_dir(path)
-      repo_path = File.join(@config[:project_root], path)
-      if File.exists?(repo_path) # TODO: check is a valid git directory
-        repo_path
       end
     end
 
@@ -197,12 +185,6 @@ module Sokoban
         return false if @req.content_type != "application/x-git-%s-request" % rpc
       end
       return false if !['upload-pack', 'receive-pack'].include? rpc
-      if rpc == 'receive-pack'
-        return @config[:receive_pack] if @config.include? :receive_pack
-      end
-      if rpc == 'upload-pack'
-        return @config[:upload_pack] if @config.include? :upload_pack
-      end
       return get_config_setting(rpc)
     end
 
@@ -217,8 +199,7 @@ module Sokoban
     end
 
     def get_git_config(config_name)
-      cmd = git_command("config #{config_name}")
-      `#{cmd}`.chomp
+      `git config #{config_name}`.chomp
     end
 
     def read_body
@@ -230,14 +211,7 @@ module Sokoban
     end
 
     def update_server_info
-      cmd = git_command("update-server-info")
-      `#{cmd}`
-    end
-
-    def git_command(command)
-      git_bin = @config[:git_path] || 'git'
-      command = "#{git_bin} #{command}"
-      command
+      `git update-server-info`
     end
 
     # --------------------------------------
