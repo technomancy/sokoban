@@ -1,0 +1,1 @@
+receiver: bin/receiver
