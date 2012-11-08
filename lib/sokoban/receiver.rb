@@ -7,7 +7,7 @@ require 'time'
 module Sokoban
   class Receiver
 
-    SERVICES =
+    ROUTES =
       [["POST", 'service_rpc',      /(.*?)\/git-upload-pack$/,  'upload-pack'],
        ["POST", 'service_rpc',      /(.*?)\/git-receive-pack$/, 'receive-pack'],
 
@@ -24,7 +24,7 @@ module Sokoban
        ["GET", 'get_idx_file',     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    DEFAULTS = { :project_root = `pwd` }
+    DEFAULTS = { :project_root => `pwd` }
 
     def initialize(config = false)
       @config = DEFAULTS.merge(config || {})
@@ -51,7 +51,7 @@ module Sokoban
     # ---------------------------------
 
     def service_rpc
-      return render_no_access if !has_access(@rpc, true)
+      return render_no_access if !has_access?(@rpc, true)
       input = read_body
 
       @res = Rack::Response.new
@@ -72,7 +72,7 @@ module Sokoban
     def get_info_refs
       service_name = get_service_type
 
-      if has_access(service_name)
+      if has_access?(service_name)
         cmd = git_command("#{service_name} --stateless-rpc --advertise-refs .")
         refs = `#{cmd}`
 
@@ -178,7 +178,7 @@ module Sokoban
     end
 
     def route(req_method, req_path)
-      SERVICES.each do |method, handler, matcher, rpc|
+      ROUTES.each do |method, handler, matcher, rpc|
         if m = matcher.match(req_path)
           if method == req_method
             path = m[1]
@@ -192,7 +192,7 @@ module Sokoban
       nil
     end
 
-    def has_access(rpc, check_content_type = false)
+    def has_access?(rpc, check_content_type = false)
       if check_content_type
         return false if @req.content_type != "application/x-git-%s-request" % rpc
       end
