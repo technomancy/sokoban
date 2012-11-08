@@ -39,8 +39,23 @@ module Sokoban
                                            @req.path_info)
 
       Dir.chdir(@repo_dir) do
-        self.send(method || :not_found)
+        self.send(method)
       end
+    end
+
+    def route(req_method, req_path)
+      ROUTES.each do |method, handler, matcher, rpc|
+        if m = matcher.match(req_path)
+          if method == req_method
+            path = m[1]
+            file = req_path.sub(path + '/', '')
+            return [handler, path, file, rpc]
+          else
+            return [:not_allowed]
+          end
+        end
+      end
+      :not_found
     end
 
     # ---------------------------------
@@ -63,9 +78,9 @@ module Sokoban
               @res.write block        # steam it to the client
             end
           end
-        else
-          not_allowed
         end
+      else
+        not_allowed
       end
     end
 
@@ -167,21 +182,6 @@ module Sokoban
       return false if !service_type
       return false if service_type[0, 4] != 'git-'
       service_type.gsub('git-', '')
-    end
-
-    def route(req_method, req_path)
-      ROUTES.each do |method, handler, matcher, rpc|
-        if m = matcher.match(req_path)
-          if method == req_method
-            path = m[1]
-            file = req_path.sub(path + '/', '')
-            return [handler, path, file, rpc]
-          else
-            return [:not_allowed]
-          end
-        end
-      end
-      nil
     end
 
     def content_type_matches?(rpc)
