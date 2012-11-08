@@ -8,18 +8,18 @@ module Sokoban
   class Receiver
 
     ROUTES =
-      [["POST", 'service_rpc',      /(.*?)\/git-upload-pack$/,  'upload-pack'],
-       ["POST", 'service_rpc',      /(.*?)\/git-receive-pack$/, 'receive-pack'],
+      [["POST", :service_rpc, /(.*?)\/git-upload-pack$/,  'upload-pack'],
+       ["POST", :service_rpc, /(.*?)\/git-receive-pack$/, 'receive-pack'],
 
-       ["GET", 'get_info_refs',    /(.*?)\/info\/refs$/],
-       ["GET", 'get_text_file',    /(.*?)\/HEAD$/],
-       ["GET", 'get_text_file',    /(.*?)\/objects\/info\/alternates$/],
-       ["GET", 'get_text_file',    /(.*?)\/objects\/info\/http-alternates$/],
-       ["GET", 'get_info_packs',   /(.*?)\/objects\/info\/packs$/],
-       ["GET", 'get_text_file',    /(.*?)\/objects\/info\/[^\/]*$/],
-       ["GET", 'get_loose_object', /(.*?)\/objects\/[0-9a-f]{2}\/[0-9a-f]{38}$/],
-       ["GET", 'get_pack_file',    /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.pack$/],
-       ["GET", 'get_idx_file',     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
+       ["GET", :get_info_refs,    /(.*?)\/info\/refs$/],
+       ["GET", :get_text_file,    /(.*?)\/HEAD$/],
+       ["GET", :get_text_file,    /(.*?)\/objects\/info\/alternates$/],
+       ["GET", :get_text_file,    /(.*?)\/objects\/info\/http-alternates$/],
+       ["GET", :get_info_packs,   /(.*?)\/objects\/info\/packs$/],
+       ["GET", :get_text_file,    /(.*?)\/objects\/info\/[^\/]*$/],
+       ["GET", :get_loose_object, /(.*?)\/objects\/[0-9a-f]{2}\/[0-9a-f]{38}$/],
+       ["GET", :get_pack_file,    /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.pack$/],
+       ["GET", :get_idx_file,     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
     def initialize(repo_url)
@@ -35,13 +35,11 @@ module Sokoban
       @env = env
       @req = Rack::Request.new(env)
 
-      cmd, path, @reqfile, @rpc = route(@req.request_method, @req.path_info)
-
-      return render_method_not_allowed if cmd == :not_allowed
-      return render_not_found if !cmd
+      method, path, @reqfile, @rpc = route(@req.request_method,
+                                           @req.path_info)
 
       Dir.chdir(@repo_dir) do
-        self.send(cmd.to_sym)
+        self.send(method || :not_found)
       end
     end
 
@@ -213,7 +211,7 @@ module Sokoban
 
     PLAIN_TYPE = {"Content-Type" => "text/plain"}
 
-    def render_method_not_allowed
+    def not_allowed
       if @env['SERVER_PROTOCOL'] == "HTTP/1.1"
         [405, PLAIN_TYPE, ["Method Not Allowed"]]
       else
@@ -221,11 +219,11 @@ module Sokoban
       end
     end
 
-    def render_not_found
+    def not_found
       [404, PLAIN_TYPE, ["Not Found"]]
     end
 
-    def render_no_access
+    def no_access
       [403, PLAIN_TYPE, ["Forbidden"]]
     end
 
