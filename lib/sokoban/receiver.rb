@@ -22,8 +22,13 @@ module Sokoban
        ["GET", 'get_idx_file',     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    def initialize(repo_dir)
-      @git_dir = repo_dir
+    def initialize(repo_url)
+      bundle = File.join("/tmp", "repo.bundle")
+      @repo_dir = File.join("/tmp", "repo.git")
+
+      system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
+      system("git bundle verify #{bundle}") or raise "Corrupt repo."
+      system("git clone --bare #{bundle} #{@repo_dir}")
     end
 
     def call(env)
@@ -35,7 +40,7 @@ module Sokoban
       return render_method_not_allowed if cmd == :not_allowed
       return render_not_found if !cmd
 
-      Dir.chdir(@git_dir) do
+      Dir.chdir(@repo_dir) do
         self.send(cmd.to_sym)
       end
     end
@@ -52,7 +57,7 @@ module Sokoban
       @res.status = 200
       @res["Content-Type"] = "application/x-git-%s-result" % @rpc
       @res.finish do
-        command = "git #{@rpc} --stateless-rpc #{@git_dir}"
+        command = "git #{@rpc} --stateless-rpc #{@repo_dir}"
         IO.popen(command, File::RDWR) do |pipe|
           pipe.write(input)
           while !pipe.eof?
@@ -128,7 +133,7 @@ module Sokoban
 
     # some of this borrowed from the Rack::File implementation
     def send_file(reqfile, content_type)
-      reqfile = File.join(@git_dir, reqfile)
+      reqfile = File.join(@repo_dir, reqfile)
       return render_not_found if !F.exists?(reqfile)
 
       @res = Rack::Response.new

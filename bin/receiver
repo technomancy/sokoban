@@ -3,6 +3,6 @@
 require "puma"
 require "sokoban/receiver"
 
-s = Puma::Server.new(Sokoban::Receiver.new)
+s = Puma::Server.new(Sokoban::Receiver.new(ENV["REPO_URL"]))
 s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
 s.run.join
