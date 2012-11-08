@@ -11,8 +11,6 @@ module Sokoban
       [["POST", 'service_rpc',      /(.*?)\/git-upload-pack$/,  'upload-pack'],
        ["POST", 'service_rpc',      /(.*?)\/git-receive-pack$/, 'receive-pack'],
 
-       # TODO: need a sensible route for this?
-       ["GET", 'get_text_file',    /(.*?)\.git$/],
        ["GET", 'get_info_refs',    /(.*?)\/info\/refs$/],
        ["GET", 'get_text_file',    /(.*?)\/HEAD$/],
        ["GET", 'get_text_file',    /(.*?)\/objects\/info\/alternates$/],
@@ -182,19 +180,9 @@ module Sokoban
 
     def has_access?(rpc, check_content_type = false)
       if check_content_type
-        return false if @req.content_type != "application/x-git-%s-request" % rpc
-      end
-      return false if !['upload-pack', 'receive-pack'].include? rpc
-      return get_config_setting(rpc)
-    end
-
-    def get_config_setting(service_name)
-      service_name = service_name.gsub('-', '')
-      setting = get_git_config("http.#{service_name}")
-      if service_name == 'uploadpack'
-        return setting != 'false'
+        @req.content_type == "application/x-git-%s-request" % rpc
       else
-        return setting == 'true'
+        ['upload-pack', 'receive-pack'].include?(rpc)
       end
     end
 
