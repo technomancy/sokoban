@@ -48,20 +48,23 @@ module Sokoban
     # ---------------------------------
 
     def service_rpc
-      return render_no_access if !has_access?(@rpc, true)
-      input = read_body
+      if content_type_matches?(@rpc)
+        input = read_body
 
-      @res = Rack::Response.new
-      @res.status = 200
-      @res["Content-Type"] = "application/x-git-%s-result" % @rpc
-      @res.finish do
-        command = "git #{@rpc} --stateless-rpc #{@repo_dir}"
-        IO.popen(command, File::RDWR) do |pipe|
-          pipe.write(input)
-          while !pipe.eof?
-            block = pipe.read(16)   # 16B at a time
-            @res.write block        # steam it to the client
+        @res = Rack::Response.new
+        @res.status = 200
+        @res["Content-Type"] = "application/x-git-%s-result" % @rpc
+        @res.finish do
+          command = "git #{@rpc} --stateless-rpc #{@repo_dir}"
+          IO.popen(command, File::RDWR) do |pipe|
+            pipe.write(input)
+            while !pipe.eof?
+              block = pipe.read(16)   # 16B at a time
+              @res.write block        # steam it to the client
+            end
           end
+        else
+          not_allowed
         end
       end
     end
@@ -69,7 +72,7 @@ module Sokoban
     def get_info_refs
       service_name = get_service_type
 
-      if has_access?(service_name)
+      if service_name == 'upload-pack' or service_name == 'receive-pack'
         refs = `git #{service_name} --stateless-rpc --advertise-refs .`
 
         @res = Rack::Response.new
@@ -86,7 +89,7 @@ module Sokoban
     end
 
     def dumb_info_refs
-      update_server_info
+      `git update-server-info`
       send_file(@reqfile, "text/plain; charset=utf-8") do
         hdr_nocache
       end
@@ -181,12 +184,8 @@ module Sokoban
       nil
     end
 
-    def has_access?(rpc, check_content_type = false)
-      if check_content_type
-        @req.content_type == "application/x-git-%s-request" % rpc
-      else
-        ['upload-pack', 'receive-pack'].include?(rpc)
-      end
+    def content_type_matches?(rpc)
+      @req.content_type == "application/x-git-%s-request" % rpc
     end
 
     def get_git_config(config_name)
@@ -199,10 +198,6 @@ module Sokoban
       else
         input = @req.body.read
       end
-    end
-
-    def update_server_info
-      `git update-server-info`
     end
 
     # --------------------------------------
