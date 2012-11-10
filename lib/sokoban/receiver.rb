@@ -35,11 +35,10 @@ module Sokoban
       @env = env
       @req = Rack::Request.new(env)
 
-      method, path, @reqfile, @rpc = route(@req.request_method,
-                                           @req.path_info)
+      method, *args = route(@req.request_method, @req.path_info)
 
       Dir.chdir(@repo_dir) do
-        self.send(method)
+        self.send(method, *args)
       end
     end
 
@@ -47,30 +46,29 @@ module Sokoban
       ROUTES.each do |method, handler, matcher, rpc|
         if m = matcher.match(req_path)
           if method == req_method
-            path = m[1]
-            file = req_path.sub(path + '/', '')
-            return [handler, path, file, rpc]
+            file = req_path.sub(m[1] + '/', '')
+            return [handler, rpc || file]
           else
             return [:not_allowed]
           end
         end
       end
-      :not_found
+      [:not_found]
     end
 
     # ---------------------------------
     # actual command handling functions
     # ---------------------------------
 
-    def service_rpc
-      if content_type_matches?(@rpc)
+    def service_rpc(rpc)
+      if content_type_matches?(rpc)
         input = read_body
 
         @res = Rack::Response.new
         @res.status = 200
-        @res["Content-Type"] = "application/x-git-%s-result" % @rpc
+        @res["Content-Type"] = "application/x-git-%s-result" % rpc
         @res.finish do
-          command = "git #{@rpc} --stateless-rpc #{@repo_dir}"
+          command = "git #{rpc} --stateless-rpc #{@repo_dir}"
           IO.popen(command, File::RDWR) do |pipe|
             pipe.write(input)
             while !pipe.eof?
@@ -84,7 +82,7 @@ module Sokoban
       end
     end
 
-    def get_info_refs
+    def get_info_refs(_)
       service_name = get_service_type
 
       if service_name == 'upload-pack' or service_name == 'receive-pack'
@@ -103,40 +101,40 @@ module Sokoban
       end
     end
 
-    def dumb_info_refs
+    def dumb_info_refs(reqfile)
       `git update-server-info`
-      send_file(@reqfile, "text/plain; charset=utf-8") do
+      send_file(reqfile, "text/plain; charset=utf-8") do
         hdr_nocache
       end
     end
 
-    def get_info_packs
+    def get_info_packs(reqfile)
       # objects/info/packs
-      send_file(@reqfile, "text/plain; charset=utf-8") do
+      send_file(reqfile, "text/plain; charset=utf-8") do
         hdr_nocache
       end
     end
 
-    def get_loose_object
-      send_file(@reqfile, "application/x-git-loose-object") do
+    def get_loose_object(reqfile)
+      send_file(reqfile, "application/x-git-loose-object") do
         hdr_cache_forever
       end
     end
 
-    def get_pack_file
-      send_file(@reqfile, "application/x-git-packed-objects") do
+    def get_pack_file(reqfile)
+      send_file(reqfile, "application/x-git-packed-objects") do
         hdr_cache_forever
       end
     end
 
-    def get_idx_file
-      send_file(@reqfile, "application/x-git-packed-objects-toc") do
+    def get_idx_file(reqfile)
+      send_file(reqfile, "application/x-git-packed-objects-toc") do
         hdr_cache_forever
       end
     end
 
-    def get_text_file
-      send_file(@reqfile, "text/plain") do
+    def get_text_file(reqfile)
+      send_file(reqfile, "text/plain") do
         hdr_nocache
       end
     end
@@ -145,31 +143,29 @@ module Sokoban
     # logic helping functions
     # ------------------------
 
-    F = ::File
-
     # some of this borrowed from the Rack::File implementation
     def send_file(reqfile, content_type)
       reqfile = File.join(@repo_dir, reqfile)
-      return render_not_found if !F.exists?(reqfile)
+      return render_not_found if !File.exists?(reqfile)
 
       @res = Rack::Response.new
       @res.status = 200
       @res["Content-Type"]  = content_type
-      @res["Last-Modified"] = F.mtime(reqfile).httpdate
+      @res["Last-Modified"] = File.mtime(reqfile).httpdate
 
       yield
 
-      if size = F.size?(reqfile)
+      if size = File.size?(reqfile)
         @res["Content-Length"] = size.to_s
         @res.finish do
-          F.open(reqfile, "rb") do |file|
+          File.open(reqfile, "rb") do |file|
             while part = file.read(8192)
               @res.write part
             end
           end
         end
       else
-        body = [F.read(reqfile)]
+        body = [File.read(reqfile)]
         size = Rack::Utils.bytesize(body.first)
         @res["Content-Length"] = size
         @res.write body
