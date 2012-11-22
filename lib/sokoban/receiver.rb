@@ -2,6 +2,8 @@ require 'zlib'
 require 'rack/request'
 require 'rack/response'
 require 'rack/utils'
+require 'redis'
+require 'json'
 require 'time'
 
 module Sokoban
@@ -29,6 +31,8 @@ module Sokoban
       system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
       system("git bundle verify #{bundle}") or raise "Corrupt repo."
       system("git clone --bare #{bundle} #{@repo_dir}")
+
+      reply
     end
 
     def call(env)
@@ -54,6 +58,12 @@ module Sokoban
         end
       end
       [:not_found]
+    end
+
+    def reply
+      host = UDPSocket.open { |s| s.connect("64.233.187.99", 1); s.addr.last }
+      reply = JSON.encode({:host => host, :port => ENV["PORT"]})
+      Redis.new(:url => ENV["REDIS_URL"]).lpush(ENV["REPLY_KEY"], reply)
     end
 
     # ---------------------------------
