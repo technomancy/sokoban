@@ -1,0 +1,8 @@
+#!/usr/bin/ruby
+
+require "puma"
+require "sokoban"
+
+s = Puma::Server.new(Sokoban::Proxy.new)
+s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
+s.run.join
