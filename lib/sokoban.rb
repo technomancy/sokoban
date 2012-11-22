@@ -4,6 +4,10 @@ require "rack/streaming_proxy"
 require "uuid"
 
 module Sokoban
+  class Error < StandardError
+    attr_accessor :status
+  end
+
   class Proxy
     def initialize
       @uuid = UUID.new
@@ -28,12 +32,13 @@ module Sokoban
     end
 
     def call(env)
-      api_key = Rack::Auth::Basic::Request.new(env).credentials[1]
       app_name = env["REQUEST_PATH"][/^(.+?)\.git/, 1]
-      receiver_url = ensure_receiver(app_name, api_key)
+      receiver_url = ensure_receiver(app_name, api_key(env))
 
-      puts "call app_name=#{app_name} api_key=#{api_key} receiver=#{receiver_url}"
+      puts "call app_name=#{app_name} receiver=#{receiver_url}"
       proxy(env, receiver_url)
+    rescue Error => e
+      [e.status, {"Content-Type" => "text/plain"}, [e.message]]
     end
 
     def ensure_receiver(app_name, api_key)
@@ -52,6 +57,15 @@ module Sokoban
       heroku = Heroku::API.new(:api_key => api_key)
       heroku.post_ps(app_name, command, { :ps_env => receiver_config })
       @redis.blpop.tap {|receiver| @redis.hset(app_name, receiver) }
+    end
+
+    def api_key(env)
+      auth = Rack::Auth::Basic::Request.new(env)
+      if auth.provided? && auth.basic? && auth.credentials
+        auth.credentials[1]
+      else
+        raise Error.new("Not authorized\n").tap{|e| e.status = 401 }
+      end
     end
   end
 end
