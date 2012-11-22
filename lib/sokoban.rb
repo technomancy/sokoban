@@ -45,7 +45,7 @@ module Sokoban
 
     def receiver_config
       # TODO: get release_url, repo get/put urls from core
-      { "REDIS_URL" => ENV["REDIS_URL"]
+      { "REDIS_URL" => ENV["REDIS_URL"],
         "REPLY_KEY" => "launched.#{@uuid.generate}",
         "REPO_GET_URL" => "http://p.hagelb.org/hooke.bundle",
       }

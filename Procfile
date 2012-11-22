@@ -1,2 +1,2 @@
-receiver: bin/receiver
-web: bin/web
+receiver: bundle exec ruby -I:lib bin/receiver
+web: bundle exec ruby -I:lib bin/web

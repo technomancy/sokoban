@@ -10,7 +10,11 @@ GEM
     puma (1.6.3)
       rack (~> 1.2)
     rack (1.4.1)
+    rack-streaming-proxy (1.0.3)
+      rack (>= 1.0)
+      servolux (~> 0.8.1)
     redis (3.0.2)
+    servolux (0.8.1)
     systemu (2.5.2)
     uuid (2.3.6)
       macaddr (~> 1.0)
@@ -24,5 +28,6 @@ DEPENDENCIES
   json
   puma
   rack
+  rack-streaming-proxy
   redis
   uuid
