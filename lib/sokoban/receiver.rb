@@ -30,7 +30,7 @@ module Sokoban
       bundle = File.join("/tmp", "repo.bundle")
       @repo_dir = File.join("/tmp", "repo.git")
 
-      log(at: "clone") do
+      log(action: "fetch") do
         system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
         system("git bundle verify #{bundle}") or raise "Corrupt repo."
         system("git clone --bare #{bundle} #{@repo_dir}")
@@ -67,7 +67,7 @@ module Sokoban
 
     def reply
       host = UDPSocket.open { |s| s.connect("64.233.187.99", 1); s.addr.last }
-      url = "http://#{host}:#{ENV["PORT"]}/"
+      url = "http://#{host}:#{ENV["PORT"]}"
       log(fn: "reply", url: url)
       Redis.new(:url => ENV["REDIS_URL"]).lpush(ENV["REPLY_KEY"], url)
     end

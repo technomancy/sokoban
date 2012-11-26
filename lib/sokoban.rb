@@ -55,8 +55,7 @@ module Sokoban
     end
 
     def ensure_receiver(app_name, api_key)
-      @redis.get(app_name) or
-        launch(app_name, api_key).tap {|url| @redis.set(app_name, url) }
+      @redis.get(app_name) or launch(app_name, api_key)
     end
 
     def receiver_config(reply_key)
@@ -75,7 +74,13 @@ module Sokoban
                        { :ps_env => receiver_config(reply_key) })
 
         log(fn: "launch", app_name: app_name, reply_key: reply_key, at: "wait")
-        @redis.blpop(reply_key, timeout: 30) or raise Error.new("Could not launch build process.")
+        _, url = @redis.blpop(reply_key, timeout: 30)
+        if url
+          @redis.set(app_name, url)
+          return url
+        else
+          raise Error.new("Could not launch build process.")
+        end
       end
     end
 
