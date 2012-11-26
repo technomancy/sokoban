@@ -75,7 +75,7 @@ module Sokoban
                        { :ps_env => receiver_config(reply_key) })
 
         log(fn: "launch", app_name: app_name, reply_key: reply_key, at: "wait")
-        @redis.blpop(reply_key, timeout: 5) or raise Error.new("Could not launch build process.")
+        @redis.blpop(reply_key, timeout: 30) or raise Error.new("Could not launch build process.")
       end
     end
 
