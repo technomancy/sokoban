@@ -41,7 +41,7 @@ module Sokoban
     end
 
     def call(env)
-      app_name = env["REQUEST_PATH"][/^(.+?)\.git/, 1]
+      app_name = env["REQUEST_PATH"][/^\/(.+?)\.git/, 1]
       receiver_url = ensure_receiver(app_name, api_key(env))
 
       log(fn: "call", app_name: app_name, receiver: receiver_url)
@@ -70,7 +70,7 @@ module Sokoban
       reply_key = "launched.#{@uuid.generate}"
       log(fn: "launch", app_name: app_name, reply_key: reply_key) do
         heroku = Heroku::API.new(:api_key => api_key)
-        heroku.post_ps(app_name, "bundle exec bin/receiver",
+        heroku.post_ps(app_name, "bundle exec ruby -I:lib bin/receiver",
                        { :ps_env => receiver_config(reply_key) })
 
         log(fn: "launch", app_name: app_name, reply_key: reply_key, at: "wait")
