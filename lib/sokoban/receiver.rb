@@ -5,9 +5,11 @@ require 'rack/utils'
 require 'redis'
 require 'json'
 require 'time'
+require 'scrolls'
 
 module Sokoban
   class Receiver
+    include Scrolls
 
     ROUTES =
       [["POST", :service_rpc, /(.*?)\/git-upload-pack$/,  'upload-pack'],
@@ -25,12 +27,16 @@ module Sokoban
       ]
 
     def initialize(repo_url)
+      Scrolls.global_context(app: "sokoban", receiver: true)
       bundle = File.join("/tmp", "repo.bundle")
       @repo_dir = File.join("/tmp", "repo.git")
 
-      system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
-      system("git bundle verify #{bundle}") or raise "Corrupt repo."
-      system("git clone --bare #{bundle} #{@repo_dir}")
+      log(at: "clone") do
+        system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
+        system("git bundle verify #{bundle}") or raise "Corrupt repo."
+        system("git clone --bare #{bundle} #{@repo_dir}")
+        File.delete(bundle)
+      end
 
       reply
     end
@@ -63,6 +69,7 @@ module Sokoban
     def reply
       host = UDPSocket.open { |s| s.connect("64.233.187.99", 1); s.addr.last }
       reply = JSON.unparse({:host => host, :port => ENV["PORT"]})
+      log(fn: "reply", host: host, port: port)
       Redis.new(:url => ENV["REDIS_URL"]).lpush(ENV["REPLY_KEY"], reply)
     end
 
