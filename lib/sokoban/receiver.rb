@@ -98,7 +98,7 @@ module Sokoban
       end
     end
 
-    def get_info_refs(_)
+    def get_info_refs(reqfile)
       service_name = get_service_type
 
       if service_name == 'upload-pack' or service_name == 'receive-pack'
@@ -113,7 +113,7 @@ module Sokoban
         @res.write(refs)
         @res.finish
       else
-        dumb_info_refs
+        dumb_info_refs(reqfile)
       end
     end
 
