@@ -6,7 +6,11 @@ require "scrolls"
 
 module Sokoban
   class Error < StandardError
-    attr_accessor :status
+    attr_reader :response
+
+    def initialize(response)
+      @response = response
+    end
   end
 
   class Proxy
@@ -43,11 +47,15 @@ module Sokoban
       log(fn: "call", app_name: app_name, receiver: receiver_url)
       proxy(env, receiver_url)
     rescue Error => e
-      [e.status, {"Content-Type" => "text/plain"}, [e.message]]
+      if e.response.is_a? Array
+        e.response
+      else
+        [500, {"Content-Type" => "text/plain"}, [e.response || "Error"]]
+      end
     end
 
     def ensure_receiver(app_name, api_key)
-      JSON.parse(@redis.hget(app_name) || launch(app_name, api_key))
+      JSON.parse(@redis.get(app_name) || launch(app_name, api_key))
     end
 
     def receiver_config(reply_key)
@@ -66,8 +74,10 @@ module Sokoban
                        { :ps_env => receiver_config(reply_key) })
 
         log(fn: "launch", app_name: app_name, reply_key: reply_key, at: "wait")
-        @redis.blpop(reply_key).tap {|receiver| @redis.hset(app_name, receiver) }
+        @redis.blpop(reply_key, timeout: 5).tap {|receiver| @redis.set(app_name, receiver) }
       end
+    rescue Redis::TimeoutError
+      raise Error.new("Could not launch build process.")
     end
 
     def api_key(env)
@@ -75,7 +85,9 @@ module Sokoban
       if auth.provided? && auth.basic? && auth.credentials
         auth.credentials[1]
       else
-        raise Error.new("Not authorized\n").tap{|e| e.status = 401 }
+        raise Error.new([401,
+                         {"WWW-Authenticate" => 'Basic realm="Restricted Area"'},
+                         ["Not Authorized"]])
       end
     end
   end
