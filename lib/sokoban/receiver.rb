@@ -3,7 +3,6 @@ require 'rack/request'
 require 'rack/response'
 require 'rack/utils'
 require 'redis'
-require 'json'
 require 'time'
 require 'scrolls'
 
@@ -68,9 +67,9 @@ module Sokoban
 
     def reply
       host = UDPSocket.open { |s| s.connect("64.233.187.99", 1); s.addr.last }
-      reply = JSON.unparse({:host => host, :port => ENV["PORT"]})
-      log(fn: "reply", host: host, port: port)
-      Redis.new(:url => ENV["REDIS_URL"]).lpush(ENV["REPLY_KEY"], reply)
+      url = "http://#{host}:#{ENV["PORT"]}/"
+      log(fn: "reply", url: url)
+      Redis.new(:url => ENV["REDIS_URL"]).lpush(ENV["REPLY_KEY"], url)
     end
 
     # ---------------------------------
