@@ -37,7 +37,7 @@ module Sokoban
         File.delete(bundle)
       end
 
-      reply
+      # reply
     end
 
     def call(env)
@@ -267,3 +267,11 @@ module Sokoban
 
   end
 end
+
+=begin
+require "puma"
+repo_url = "http://p.hagelb.org/hooke.bundle"
+s = Puma::Server.new(Sokoban::Receiver.new(repo_url))
+s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
+t = s.run
+=end

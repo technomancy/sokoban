@@ -55,7 +55,8 @@ module Sokoban
     end
 
     def ensure_receiver(app_name, api_key)
-      @redis.get(app_name) or launch(app_name, api_key)
+      "http://localhost:8888"
+      # @redis.get(app_name) or launch(app_name, api_key)
     end
 
     def receiver_config(reply_key)
@@ -63,6 +64,7 @@ module Sokoban
       { "REDIS_URL" => ENV["REDIS_URL"],
         "REPLY_KEY" => reply_key,
         "REPO_GET_URL" => "http://p.hagelb.org/sokoban.bundle",
+        "REPO_PUT_URL" => ""
       }
     end
 
@@ -74,18 +76,18 @@ module Sokoban
                        { :ps_env => receiver_config(reply_key) })
 
         log(fn: "launch", app_name: app_name, reply_key: reply_key, at: "wait")
-        _, url = @redis.blpop(reply_key, timeout: 30)
+        _, url = @redis.blpop(reply_key, timeout: 60)
         if url
           @redis.set(app_name, url)
           return url
         else
-          raise Error.new("Could not launch build process.")
+          raise Error.new("Timed out launching build process.")
         end
       end
     end
 
     def api_key(env)
-      auth = Rack::Auth::Basic::Request.new(env) # TODO: git never honors netrc
+      auth = Rack::Auth::Basic::Request.new(env)
       if auth.provided? && auth.basic? && auth.credentials
         auth.credentials[1]
       else
@@ -96,3 +98,11 @@ module Sokoban
     end
   end
 end
+
+=begin
+require "puma"
+
+s = Puma::Server.new(Sokoban::Proxy.new)
+s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
+t = s.run
+=end
