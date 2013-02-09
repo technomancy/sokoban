@@ -4,6 +4,7 @@ require 'rack/response'
 require 'rack/utils'
 require 'redis'
 require 'time'
+require 'fileutils'
 require 'scrolls'
 
 module Sokoban
@@ -28,7 +29,8 @@ module Sokoban
     def initialize(repo_url)
       Scrolls.global_context(app: "sokoban", receiver: true)
       bundle = File.join("/tmp", "repo.bundle")
-      @repo_dir = File.join("/tmp", "repo.git")
+      @repo_dir = File.join("/tmp", "repo")
+      FileUtils.rm_rf(@repo_dir)
 
       log(action: "fetch") do
         system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
@@ -37,7 +39,21 @@ module Sokoban
         File.delete(bundle)
       end
 
-      # reply
+      install_hooks
+    end
+
+    def install_hooks
+      hooks_dir = File.join(@repo_dir, ".git", "hooks")
+      FileUtils.rm_rf(hooks_dir)
+      FileUtils.mkdir_p(hooks_dir)
+      sokoban = "/home/phil/src/sokoban/bin/sokoban" # TODO: calculate properly
+      File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
+        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive")
+      end
+      File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
+        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive")
+      end
+      FileUtils.chmod_R(0755, hooks_dir)
     end
 
     def call(env)
