@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+require "sokoban"
+abort "Commands: proxy, receive, pre_receive, post_receive" if ARGV.empty?
+Sokoban.send(*ARGV)
