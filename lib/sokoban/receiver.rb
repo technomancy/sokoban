@@ -43,7 +43,7 @@ module Sokoban
     end
 
     def install_hooks
-      hooks_dir = File.join(@repo_dir, ".git", "hooks")
+      hooks_dir = File.join(@repo_dir, "hooks")
       FileUtils.rm_rf(hooks_dir)
       FileUtils.mkdir_p(hooks_dir)
       sokoban = "/home/phil/src/sokoban/bin/sokoban" # TODO: calculate properly

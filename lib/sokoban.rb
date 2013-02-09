@@ -15,15 +15,15 @@ module Sokoban
     if STDIN.read.split("\n").grep(/\s+refs\/heads\/master$/).empty?
       puts "Pushed to non-master branch, skipping build."
     else
-      File.write("/tmp/requiring", "yup")
       require "slug_compiler"
+
       build_dir = "/tmp/build"
       buildpack_url = "/home/phil/src/heroku-buildpack-clojure"
       cache_dir = "/tmp/cache"
       output_dir = "/tmp/out"
-      File.write("/tmp/cloning", "ya")
-      system("git", "clone", File.join(Dir.pwd, ".."), build_dir)
-      File.write("/tmp/compiling", "yes")
+      FileUtils.rm_rf(build_dir)
+
+      system("git", "clone", Dir.pwd, build_dir)
       slug, process_types = SlugCompiler.run(build_dir, buildpack_url,
                                              cache_dir, output_dir)
       puts "done"
@@ -34,9 +34,10 @@ module Sokoban
   end
 
   def post_receive
-    post_repo
-    post_slug
-    post_release
+    # TODO: ensure failures here trickle back to client
+    # post_repo
+    # post_slug
+    # post_release
   ensure
     suicide_dyno
   end
@@ -45,8 +46,8 @@ module Sokoban
     require "puma"
     s = Puma::Server.new(handler)
     s.add_tcp_listener("0.0.0.0", port)
-    # s.run.join
-    s.run
+    thread = s.run
+    thread.join unless defined? IRB
   end
 
   def suicide_dyno
