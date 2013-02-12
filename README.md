@@ -9,7 +9,7 @@ it's up. Stores an app->dyno mapping in Redis.
 ## Steps
 
 * [X] Pushing straight to receiver updates local copy of repo
-* [ ] Direct receiver runs slug compilation
+* [X] Direct receiver runs slug compilation
 * [ ] Direct receiver can post a release
 * [ ] Pushing to proxy with hard-coded receiver URL
 * [ ] Pushing to an actual dyno
