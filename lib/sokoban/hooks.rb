@@ -5,7 +5,7 @@ require "net/http"
 module Sokoban
   module_function
 
-  def pre_receive(user, app_id, buildpack_url, slug_put_url=nil, slug_url=nil)
+  def pre_receive(user, app_name, buildpack_url, slug_put_url=nil, slug_url=nil)
     if STDIN.read.split("\n").grep(/\s+refs\/heads\/master$/).empty?
       puts "Pushed to non-master branch, skipping build."
     else
@@ -25,9 +25,9 @@ module Sokoban
         puts("-----> Launching...")
         put_slug(slug, slug_put_url)
         params = release_params(slug, dyno_types, user, slug_url)
-        app_url, release_name = post_release(app_id, params)
-        puts("       ...done.") # TODO: include release name
-        puts("       #{app_url} deployed to Heroku")
+        release_name = post_release(app_name, params)
+        puts("       ...done, #{release_name}.")
+        puts("       http://#{app_name}.herokuapp.com deployed to Heroku\n")
       end
     end
   end
@@ -47,9 +47,9 @@ module Sokoban
     end
   end
 
-  def post_release(app_id, params)
+  def post_release(app_name, params)
     Timeout.timeout((ENV["POST_RELEASE_TIMEOUT"] || 30).to_i) do
-      response = release_request(app_id, params)
+      response = release_request(app_name, params)
       unless (response.code =~ /^2/)
         error_message = begin
                           response.body && JSON.parse(response.body)["error"] \
@@ -61,9 +61,8 @@ module Sokoban
                         end
         abort(error_message)
       end
-      # TODO: need app_url as well as release_name from this call
-      # JSON.parse(response.body)
-      app_id
+      # might be nice to get a canonical app_url back from here?
+      JSON.parse(response.body) # release name
     end
   end
 
@@ -79,8 +78,8 @@ module Sokoban
       }
   end
 
-  def release_request(app_id, params)
-    uri = release_uri(app_id)
+  def release_request(app_name, params)
+    uri = release_uri(app_name)
     Net::HTTP.start(uri.host, uri.port) do |http|
       request = Net::HTTP::Post.new(uri.request_uri)
       request.basic_auth(uri.user, uri.password)
@@ -91,9 +90,9 @@ module Sokoban
     end
   end
 
-  def release_uri(app_id)
+  def release_uri(app_name)
     URI.parse((ENV["RELEASE_URI"] || \
-               "https://api.heroku.com/apps/%s/releases") % app_id)
+               "https://api.heroku.com/apps/%s/releases") % app_name)
   end
 
   def put_file(file, put_url)

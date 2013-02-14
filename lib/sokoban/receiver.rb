@@ -26,7 +26,7 @@ module Sokoban
        ["GET", :get_idx_file,     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    def initialize(repo_url, user, app_id, buildpack_url,
+    def initialize(repo_url, user, app_name, buildpack_url,
                    slug_put_url, slug_url, repo_put_url)
       Scrolls.global_context(app: "sokoban", receiver: true)
       bundle = File.join("/tmp", "repo.bundle")
@@ -40,11 +40,11 @@ module Sokoban
         File.delete(bundle)
       end
 
-      install_hooks(user, app_id, buildpack_url,
+      install_hooks(user, app_name, buildpack_url,
                     slug_put_url, slug_url, repo_put_url)
     end
 
-    def install_hooks(user, app_id, buildpack_url,
+    def install_hooks(user, app_name, buildpack_url,
                       slug_put_url, slug_url, repo_put_url)
       hooks_dir = File.join(@repo_dir, "hooks")
       FileUtils.rm_rf(hooks_dir)
@@ -52,7 +52,7 @@ module Sokoban
       sokoban = "/home/phil/src/sokoban/bin/sokoban" # TODO: calculate properly
       File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
         f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive_hook " \
-               "'#{user}' '#{app_id}' '#{buildpack_url}' " \
+               "'#{user}' '#{app_name}' '#{buildpack_url}' " \
                "'#{slug_put_url}' '#{slug_url}'")
       end
       File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
