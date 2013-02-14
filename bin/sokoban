@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
 
 require "sokoban"
-abort "Commands: proxy, receive, pre_receive, post_receive" if ARGV.empty?
+abort "Commands: proxy, receive, pre_receive_hook, post_receive_hook" if ARGV.empty?
 Sokoban.send(*ARGV)

@@ -26,7 +26,8 @@ module Sokoban
        ["GET", :get_idx_file,     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    def initialize(repo_url, buildpack_url, slug_url, release_url)
+    def initialize(repo_url, user, app_id, buildpack_url,
+                   slug_put_url, slug_url, repo_put_url)
       Scrolls.global_context(app: "sokoban", receiver: true)
       bundle = File.join("/tmp", "repo.bundle")
       @repo_dir = File.join("/tmp", "repo")
@@ -39,20 +40,24 @@ module Sokoban
         File.delete(bundle)
       end
 
-      install_hooks(buildpack_url, slug_url, release_url)
+      install_hooks(user, app_id, buildpack_url,
+                    slug_put_url, slug_url, repo_put_url)
     end
 
-    def install_hooks(buildpack_url, slug_url, release_url)
+    def install_hooks(user, app_id, buildpack_url,
+                      slug_put_url, slug_url, repo_put_url)
       hooks_dir = File.join(@repo_dir, "hooks")
       FileUtils.rm_rf(hooks_dir)
       FileUtils.mkdir_p(hooks_dir)
       sokoban = "/home/phil/src/sokoban/bin/sokoban" # TODO: calculate properly
       File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
-        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive " \
-               "'#{buildpack_url}' '#{slug_url}' '#{release_url}'")
+        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive_hook " \
+               "'#{user}' '#{app_id}' '#{buildpack_url}' " \
+               "'#{slug_put_url}' '#{slug_url}'")
       end
       File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
-        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive")
+        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive_hook " \
+               "'#{repo_put_url}'")
       end
       FileUtils.chmod_R(0755, hooks_dir)
     end
@@ -284,11 +289,3 @@ module Sokoban
 
   end
 end
-
-=begin
-require "puma"
-repo_url = "http://p.hagelb.org/hooke.bundle"
-s = Puma::Server.new(Sokoban::Receiver.new(repo_url))
-s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
-t = s.run
-=end
