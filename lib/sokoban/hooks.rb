@@ -24,8 +24,12 @@ module Sokoban
       if slug_put_url
         puts("-----> Launching...")
         put_slug(slug, slug_put_url)
-        params = release_params(slug, dyno_types, user, slug_url)
-        release_name = post_release(app_name, params)
+        # V2 releases
+        repo_size = `du -s -x #{Dir.pwd}`.split(" ").first.to_i*1024
+        post_release_v2(slug, dyno_types, user, slug_url, repo_size)
+        # V3 releases
+        # params = release_params(slug, dyno_types, user, slug_url)
+        # release_name = post_release(app_name, params)
         puts("       ...done, #{release_name}.")
         puts("       http://#{app_name}.herokuapp.com deployed to Heroku\n")
       end
@@ -75,7 +79,7 @@ module Sokoban
       "description" => "TODO: A Sokoban-built release!",
       "dyno_types" => dyno_types,
       "slug_url" => slug_url,
-      }
+    }
   end
 
   def release_request(app_name, params)
@@ -97,11 +101,66 @@ module Sokoban
 
   def put_file(file, put_url)
     url = URI.parse(put_url)
-    request = Net::HTTP::Post.new(url.path)
+    request = Net::HTTP::Put.new(url.path)
     request.body_stream = File.open(file)
     request["Content-Length"] = File.size(file)
     response = Net::HTTP.start(url.host, url.port) do |http|
       http.request(request)
     end
+  end
+
+  # The above is designed to work against the v3 releases API, which
+  # doesn't exist yet! So here's some stuff that works with v2:
+  def post_release_v2(slug, dyno_types, user, slug_url, repo_size)
+    slug_url_regex = /https:\/\/s3.amazonaws.com\/(.+?)\/(.+?)\?/
+    _, slug_put_key, slug_put_bucket = slug_url.match(slug_url_regex).to_a
+    start = Time.now
+    payload = {
+      # "head" => head,
+      # "prev_head" => commit_hash,
+      # "current_seq" => current_seq,
+      "slug_put_key" => slug_put_key,
+      "slug_put_bucket" => slug_put_bucket,
+      "repo_size" => repo_size,
+      "release_descr" => "sokoban-built release", # punting for v2
+      "language_pack" => "Sokoban", # punting for v2
+      "buildpack" => "Sokoban", # punting for v2
+      "slug_version" => 2,
+      "slug_size" => File.size(slug),
+      "stack" => "cedar",
+      "user" => user,
+      "process_types" => dyno_types,
+      "git_log" => "",
+      "run_deploy_hooks" => false,
+      "addons" => {},
+      "config_vars" => {}}
+
+    release_name =
+      Timeout.timeout(30) do
+      uri = URI.parse(release_url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      request = Net::HTTP::Post.new(uri.request_uri)
+      if uri.scheme == "https"
+        http.use_ssl = true
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      end
+      request.basic_auth(uri.user, uri.password)
+      request["Content-Type"] = "application/json"
+      request["Accept"] = "application/json"
+      request.body = OkJson.encode(payload)
+      response = http.request(request)
+      if (response.code != "200")
+        error_message = begin
+                          response.body && OkJson.decode(response.body)["error"] || "failure releasing code"
+                        rescue Timeout::Error
+                          "timed out releasing code"
+                        rescue
+                          "failure releasing code"
+                        end
+        raise(error_message)
+      end
+      response.body
+    end
+    release_name
   end
 end
