@@ -44,7 +44,7 @@ module Sokoban
           system("git", "clone", "--bare", bundle, @repo_dir)
         else # repo doesn't exist or was corrupt
           log(action: "init-repo")
-          system("git", "init", @repo_dir)
+          system("git", "init", "--bare", @repo_dir)
         end
         File.delete(bundle)
       end
@@ -61,15 +61,12 @@ module Sokoban
         FileUtils.mkdir_p(hooks_dir)
         sokoban = File.join(File.dirname(__FILE__), "..", "..", "bin", "sokoban")
 
-        File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
-          f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive_hook " \
-                 "'#{user}' '#{app_name}' '#{buildpack_url}' " \
-                 "'#{slug_put_url}' '#{slug_url}'")
-        end
         File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
           f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive_hook " \
-                 "'#{repo_put_url}'")
+                 "'#{user}' '#{app_name}' '#{buildpack_url}' " \
+                 "'#{slug_put_url}' '#{slug_url}' '#{repo_put_url}'")
         end
+
         FileUtils.chmod_R(0755, hooks_dir)
       end
     end

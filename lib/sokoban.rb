@@ -13,14 +13,6 @@ module Sokoban
     Sokoban.start_server(Sokoban::Receiver.new(*args), (ENV["PORT"] || 5001))
   end
 
-  def pre_receive_hook(*args)
-    require "sokoban/hooks"
-    Sokoban.pre_receive(*args)
-  rescue
-    suicide_dyno
-    raise
-  end
-
   def post_receive_hook(*args)
     require "sokoban/hooks"
     Sokoban.post_receive(*args)

@@ -35,11 +35,11 @@ triggers.
 
 ## Hooks
 
-Sokoban uses the **pre-receive** hook to trigger a compilation of the
+Sokoban uses the **post-receive** hook to trigger a compilation of the
 codebase being pushed. Once it's compiled, it uploads the slug and
 performs a `POST` to Heroku's release API to finish the deploy. If
-that succeeds, the **post-receive** hook archives the repository
-itself to S3 for the next push.
+that succeeds, it archives the repository itself to S3 for the next
+push.
 
 ## Milestones
 

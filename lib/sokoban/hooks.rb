@@ -6,7 +6,8 @@ require "tempfile"
 module Sokoban
   module_function
 
-  def pre_receive(user, app_name, buildpack_url, slug_put_url=nil, slug_url=nil)
+  def post_receive(user, app_name, buildpack_url,
+                   slug_put_url=nil, slug_url=nil, repo_put_url=nil)
     if STDIN.read.split("\n").grep(/\s+refs\/heads\/master$/).empty?
       puts "Pushed to non-master branch, skipping build."
     else
@@ -37,9 +38,8 @@ module Sokoban
         puts("       http://#{app_name}.herokuapp.com deployed to Heroku\n")
       end
     end
-  end
 
-  def post_receive(repo_put_url)
+    # repo put
     bundle = Tempfile.new("bundle").tap(&:close)
     system("git", "bundle", "create", bundle.path,
            [:out, :err] => "/dev/null")
