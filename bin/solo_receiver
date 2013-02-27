@@ -2,8 +2,10 @@
 require 'openssl'
 require 'digest/sha1'
 require 'base64'
+require 'uri'
 
 BUCKET = ENV["SOKOBAN_BUCKET"] || abort("need SOKOBAN_BUCKET env var")
+AWS_ACCESS_KEY = ENV["AWS_ACCESS_KEY"] || abort("need AWS_ACCESS_KEY env var")
 AWS_SECRET_KEY = ENV["AWS_SECRET_KEY"] || abort("need AWS_SECRET_KEY env var")
 
 SIGNS = {'+' => "%2B", '=' => "%3D", '?' => '%3F', '@' => '%40',
@@ -15,12 +17,12 @@ def signed_url(path, expire_date, method = "GET")
   digest = OpenSSL::Digest::Digest.new('sha1')
   can_string = "#{method}\n\n\n#{expire_date}\n/#{BUCKET}/#{path}"
   hmac = OpenSSL::HMAC.digest(digest, AWS_SECRET_KEY, can_string)
-  signature = URI.escape(Base64.encode64(hmac).strip)
-  encoded_signature = SIGNS.inject(str) {|s, kv| s.gsub(kv.first, kv.last) }
+  sig = URI.escape(Base64.encode64(hmac).strip)
+  encoded_signature = SIGNS.inject(sig) {|s, kv| s.gsub(kv.first, kv.last) }
 
-  "https://s3.amazonaws.com/#{S3_BUCKET}/#{path}" +
-    "?AWSAccessKeyId=#{S3_ACCESS_KEY_ID}&Expires=#{expire_date}" +
-    "&Signature=#{signature}"
+  "https://s3.amazonaws.com/#{BUCKET}/#{path}" +
+    "?AWSAccessKeyId=#{AWS_ACCESS_KEY}&Expires=#{expire_date}" +
+    "&Signature=#{encoded_signature}"
 end
 
 abort "USAGE: $0 APP_NAME BUILDPACK_URL" if(ARGV.size != 2)
@@ -33,8 +35,8 @@ expire_at = Time.now.to_i + 60*60
 repo_url = signed_url("/repos/#{app_name}.bundle", expire_at)
 repo_put_url = signed_url("/repos/#{app_name}.bundle", expire_at, "PUT")
 
-slug_url signed_url("/slugs/#{compile_id}", expire_at)
-slug_put_url signed_url("/slugs/#{compile_id}", expire_at, "PUT")
+slug_url = signed_url("/slugs/#{compile_id}", expire_at)
+slug_put_url = signed_url("/slugs/#{compile_id}", expire_at, "PUT")
 
 user = `heroku auth:whoami`.strip
 args = [repo_url, user, app_name, buildpack_url,

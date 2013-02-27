@@ -35,7 +35,7 @@ module Sokoban
 
       log(action: "fetch") do
         if(repo_url =~ /^http/)
-          system("curl", "--retry", "3", "--max-time", 90, repo_url,
+          system("curl", "--retry", "3", "--max-time", "90", repo_url,
                  :out => bundle)
         else # local repo for testing
           FileUtils.cp(repo_url, bundle)
