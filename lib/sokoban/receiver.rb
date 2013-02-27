@@ -34,9 +34,14 @@ module Sokoban
       FileUtils.rm_rf(@repo_dir)
 
       log(action: "fetch") do
-        system("curl --retry 3 --max-time 90 #{repo_url} > #{bundle}")
-        system("git bundle verify #{bundle}") or raise "Corrupt repo."
-        system("git clone --bare #{bundle} #{@repo_dir}")
+        system("curl", "--retry", "3", "--max-time", 90, repo_url,
+               :out => bundle)
+        if(system("git", "bundle", "verify", bundle))
+          system("git", "clone", bundle, @repo_dir)
+        else # repo doesn't exist or was corrupt
+          log(action: "init-repo")
+          system("git", "init", @repo_dir)
+        end
         File.delete(bundle)
       end
 
@@ -46,20 +51,23 @@ module Sokoban
 
     def install_hooks(user, app_name, buildpack_url,
                       slug_put_url, slug_url, repo_put_url)
-      hooks_dir = File.join(@repo_dir, "hooks")
-      FileUtils.rm_rf(hooks_dir)
-      FileUtils.mkdir_p(hooks_dir)
-      sokoban = "/home/phil/src/sokoban/bin/sokoban" # TODO: calculate properly
-      File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
-        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive_hook " \
-               "'#{user}' '#{app_name}' '#{buildpack_url}' " \
-               "'#{slug_put_url}' '#{slug_url}'")
+      log(action: "install-hooks") do
+        hooks_dir = File.join(@repo_dir, "hooks")
+        FileUtils.rm_rf(hooks_dir)
+        FileUtils.mkdir_p(hooks_dir)
+        sokoban = File.join(File.dirname(__FILE__), "..", "..", "bin", "sokoban")
+
+        File.open(File.join(hooks_dir, "pre-receive"), "w") do |f|
+          f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} pre_receive_hook " \
+                 "'#{user}' '#{app_name}' '#{buildpack_url}' " \
+                 "'#{slug_put_url}' '#{slug_url}'")
+        end
+        File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
+          f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive_hook " \
+                 "'#{repo_put_url}'")
+        end
+        FileUtils.chmod_R(0755, hooks_dir)
       end
-      File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
-        f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive_hook " \
-               "'#{repo_put_url}'")
-      end
-      FileUtils.chmod_R(0755, hooks_dir)
     end
 
     def call(env)
