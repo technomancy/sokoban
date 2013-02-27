@@ -1,3 +1,9 @@
+GIT
+  remote: git://github.com/heroku/slug-compiler.git
+  revision: 1fd7459579296f084f2e57e9f70d1603d819d0b3
+  specs:
+    slug-compiler (2.0.0)
+
 GEM
   remote: http://rubygems.org/
   specs:
@@ -16,7 +22,6 @@ GEM
     redis (3.0.2)
     scrolls (0.2.1)
     servolux (0.8.1)
-    slug-compiler (2.0.0)
     systemu (2.5.2)
     uuid (2.3.6)
       macaddr (~> 1.0)
@@ -33,5 +38,5 @@ DEPENDENCIES
   rack-streaming-proxy
   redis
   scrolls
-  slug-compiler
+  slug-compiler!
   uuid
