@@ -37,10 +37,8 @@ slug_url signed_url("/slugs/#{compile_id}", expire_at)
 slug_put_url signed_url("/slugs/#{compile_id}", expire_at, "PUT")
 
 user = `heroku auth:whoami`.strip
-
 args = [repo_url, user, app_name, buildpack_url,
         slug_put_url, slug_url, repo_put_url]
 
 puts "bundle exec ruby -I:lib bin/sokoban receive " +
   args.map{|s| "'#{s}'"}.join(" ")
-
