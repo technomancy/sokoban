@@ -51,6 +51,11 @@ module Sokoban
 
       install_hooks(user, app_name, buildpack_url,
                     slug_put_url, slug_url, repo_put_url)
+
+      # TODO: do the right thing here
+      host = bash("/sbin/ifconfig eth0 | grep inet | awk '{print $2}'"). \
+        gsub("addr:", "").strip
+      puts("Started on #{host} #{ENV['PORT']}")
     end
 
     def install_hooks(user, app_name, buildpack_url,
