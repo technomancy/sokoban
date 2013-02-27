@@ -1,6 +1,7 @@
 require "json"
 require "uri"
 require "net/http"
+require "tempfile"
 
 module Sokoban
   module_function
@@ -18,6 +19,7 @@ module Sokoban
 
       system("git", "clone", Dir.pwd, build_dir,
              [:out, :err] => "/dev/null")
+      # TODO: appears to be running on the prior revision
       slug, dyno_types = SlugCompiler.run(build_dir, buildpack_url,
                                           cache_dir, output_dir)
 
@@ -26,7 +28,8 @@ module Sokoban
         put_slug(slug, slug_put_url)
         # V2 releases
         repo_size = `du -s -x #{Dir.pwd}`.split(" ").first.to_i*1024
-        post_release_v2(slug, dyno_types, user, slug_url, repo_size)
+        release_name = post_release_v2(app_name, slug, dyno_types, user,
+                                       slug_url, repo_size)
         # V3 releases
         # params = release_params(slug, dyno_types, user, slug_url)
         # release_name = post_release(app_name, params)
@@ -36,12 +39,12 @@ module Sokoban
     end
   end
 
-  def post_receive(build_dir, repo_put_url)
+  def post_receive(repo_put_url)
     bundle = Tempfile.new("bundle").tap(&:close)
     system("git", "bundle", "create", bundle.path,
-           [:out, :err] => "/dev/null", :chdir => build_dir)
+           [:out, :err] => "/dev/null")
     Timeout.timeout((ENV["REPO_PUT_TIMEOUT"] || 120).to_i) do
-      put_file(bundle, repo_put_url)
+      put_file(bundle.path, repo_put_url)
     end
   end
 
@@ -95,8 +98,7 @@ module Sokoban
   end
 
   def release_uri(app_name)
-    URI.parse((ENV["RELEASE_URI"] || \
-               "https://api.heroku.com/apps/%s/releases") % app_name)
+    (ENV["RELEASE_URI"] || "https://api.heroku.com/apps/%s/releases") % app_name
   end
 
   def put_file(file, put_url)
@@ -111,7 +113,7 @@ module Sokoban
 
   # The above is designed to work against the v3 releases API, which
   # doesn't exist yet! So here's some stuff that works with v2:
-  def post_release_v2(slug, dyno_types, user, slug_url, repo_size)
+  def post_release_v2(app_name, slug, dyno_types, user, slug_url, repo_size)
     slug_url_regex = /https:\/\/s3.amazonaws.com\/(.+?)\/(.+?)\?/
     _, slug_put_key, slug_put_bucket = slug_url.match(slug_url_regex).to_a
     start = Time.now
@@ -137,7 +139,7 @@ module Sokoban
 
     release_name =
       Timeout.timeout(30) do
-      uri = URI.parse(release_url)
+      uri = URI.parse(release_uri(app_name))
       http = Net::HTTP.new(uri.host, uri.port)
       request = Net::HTTP::Post.new(uri.request_uri)
       if uri.scheme == "https"
@@ -147,11 +149,11 @@ module Sokoban
       request.basic_auth(uri.user, uri.password)
       request["Content-Type"] = "application/json"
       request["Accept"] = "application/json"
-      request.body = OkJson.encode(payload)
+      request.body = JSON.unparse(payload)
       response = http.request(request)
       if (response.code != "200")
         error_message = begin
-                          response.body && OkJson.decode(response.body)["error"] || "failure releasing code"
+                          response.body && JSON.parse(response.body)["error"] || "failure releasing code"
                         rescue Timeout::Error
                           "timed out releasing code"
                         rescue
