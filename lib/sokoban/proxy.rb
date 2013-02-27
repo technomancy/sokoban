@@ -55,7 +55,7 @@ module Sokoban
     end
 
     def ensure_receiver(app_name, api_key)
-      "http://localhost:8888"
+      ENV["RECEIVER_URL"] || "http://localhost:5001"
       # @redis.get(app_name) or launch(app_name, api_key)
     end
 
@@ -98,11 +98,3 @@ module Sokoban
     end
   end
 end
-
-=begin
-require "puma"
-
-s = Puma::Server.new(Sokoban::Proxy.new)
-s.add_tcp_listener("localhost", (ENV["PORT"] || 5000))
-t = s.run
-=end
