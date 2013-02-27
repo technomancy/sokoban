@@ -34,10 +34,14 @@ module Sokoban
       FileUtils.rm_rf(@repo_dir)
 
       log(action: "fetch") do
-        system("curl", "--retry", "3", "--max-time", 90, repo_url,
-               :out => bundle)
+        if(repo_url =~ /^http/)
+          system("curl", "--retry", "3", "--max-time", 90, repo_url,
+                 :out => bundle)
+        else # local repo for testing
+          FileUtils.cp(repo_url, bundle)
+        end
         if(system("git", "bundle", "verify", bundle))
-          system("git", "clone", bundle, @repo_dir)
+          system("git", "clone", "--bare", bundle, @repo_dir)
         else # repo doesn't exist or was corrupt
           log(action: "init-repo")
           system("git", "init", @repo_dir)
