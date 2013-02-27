@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+
+require "sokoban"
+require "rack"
+require "puma"
+require "fileutils"
+
+module Accept
+  def self.call(env)
+    [200, {"Content-Type" => "text/plain"}, ["OK"]]
+  end
+end
+
+s = Puma::Server.new(Accept)
+s.add_tcp_listener("localhost", 5005)
+puts "started on #{ARGV.first}"
+s.run
+
+ENV["RELEASE_URI"] = "http://localhost:5005/"
+
+abort "Usage: $0 REPO_BUNDLE BUILDPACK_DIR" if ARGV.size != 2
+
+user = `whoami`
+app_name = "app"
+slug_put_url = slug_url = repo_put_url = "http://localhost:5005/"
+repo_url, buildpack_url = ARGV
+
+FileUtils.rm_rf(["/tmp/repo", "/tmp/build", "/tmp/out"])
+
+Sokoban.receive(repo_url, user, app_name, buildpack_url,
+                slug_put_url, slug_url, repo_put_url)
