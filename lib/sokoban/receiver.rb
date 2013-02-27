@@ -55,7 +55,7 @@ module Sokoban
       # TODO: do the right thing here
       ifconfig = `/sbin/ifconfig eth0 | grep inet | awk '{print $2}'`
       host = ifconfig.gsub("addr:", "").strip
-      puts("Started on #{host} #{ENV['PORT']}")
+      puts("Started on #{host}:#{ENV['PORT']}")
     end
 
     def install_hooks(user, app_name, buildpack_url,

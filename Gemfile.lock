@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/heroku/slug-compiler.git
-  revision: 1fd7459579296f084f2e57e9f70d1603d819d0b3
+  revision: 1a85e758dee62db6a4459736030bf27f7f14a26b
   specs:
     slug-compiler (2.0.0)
 
