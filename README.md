@@ -21,12 +21,6 @@ Accepts HTTP requests from git for a specific app. Receivers are
 designed to be disposable and be used for a single push. They run as
 an app under the account of the user doing the push.
 
-The `bin/solo_receiver` script can emit a command with signed URLs
-to launch a receiver for you if you want to run it without the proxy;
-just provide it with an S3 bucket, AWS secret key, app name, and
-buildpack URL. During normal usage the first two would be provided by
-the proxy and the second two by the user initiating the push.
-
 The receiver fetches the repository and receives new commits, but it
 can't tell when the git push itself is complete; that's up to the git
 client. So in order to trigger compilation when the push is complete,
@@ -40,6 +34,23 @@ codebase being pushed. Once it's compiled, it uploads the slug and
 performs a `POST` to Heroku's release API to finish the deploy. If
 that succeeds, it archives the repository itself to S3 for the next
 push.
+
+## Standalone Usage
+
+The `bin/solo_receiver` script can emit a command with signed URLs to
+launch a receiver for you if you want to run it without the proxy;
+just provide it with an S3 bucket, AWS secret key, app name,
+credentials, and buildpack URL. During normal usage the first two
+would be provided by the proxy and the latter three by the user
+initiating the push.
+
+    $ export SOKOBAN_BUCKET=[...] AWS_ACCESS_KEY=[...] AWS_SECRET_KEY=[...]
+    $ eval $(bin/solo_receiver myapp \
+        git://github.com/bmizerany/null-null-buildpack.git)
+
+In another terminal:
+
+    $ cd ~/src/myapp && git push http://localhost:5001 master
 
 ## Milestones
 
