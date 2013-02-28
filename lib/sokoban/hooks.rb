@@ -102,19 +102,21 @@ module Sokoban
   end
 
   def put_file(file, put_url)
-    url = URI.parse(put_url)
-    request = Net::HTTP::Put.new(url.path)
-    request.body_stream = File.open(file)
-    request["Content-Length"] = File.size(file)
-    response = Net::HTTP.start(url.host, url.port) do |http|
-      http.request(request)
-    end
+    status_file = Tempfile.new("curl_out").tap(&:close).path
+    # Net::HTTP can't make requests to signed URLs
+    system("curl", "--write-out", "%{http_code}",
+           "--data-binary", "@#{file}", "--header", "Content-Type:",
+           "--request", "PUT", "--url", put_url, "--silent",
+           :out => status_file)
+    status = File.read(status_file)
+    raise("PUT failed: #{status}") unless status == "200"
   end
 
   # The above is designed to work against the v3 releases API, which
   # doesn't exist yet! So here's some stuff that works with v2:
   def post_release_v2(app_name, slug, dyno_types, user, token,
                       slug_url, repo_size)
+    slug_url_regex = /https:\/\/(.+?)\.s3\.amazonaws\.com\/(.+?)\?/
     _, slug_put_key, slug_put_bucket = slug_url.match(slug_url_regex).to_a
     start = Time.now
     payload = {

@@ -2,27 +2,22 @@
 require 'openssl'
 require 'digest/sha1'
 require 'base64'
-require 'uri'
+require 'cgi'
 
 BUCKET = ENV["SOKOBAN_BUCKET"] || abort("need SOKOBAN_BUCKET env var")
 AWS_ACCESS_KEY = ENV["AWS_ACCESS_KEY"] || abort("need AWS_ACCESS_KEY env var")
 AWS_SECRET_KEY = ENV["AWS_SECRET_KEY"] || abort("need AWS_SECRET_KEY env var")
 
-SIGNS = {'+' => "%2B", '=' => "%3D", '?' => '%3F', '@' => '%40',
-  '$' => '%24', '&' => '%26', ',' => '%2C', '/' => '%2F', ':' => '%3A',
-  ';' => '%3B', '?' => '%3F'}
-
-# adapted from https://gist.github.com/mcansky/3434417
-def signed_url(path, expire_date, method = "GET")
-  digest = OpenSSL::Digest::Digest.new('sha1')
-  can_string = "#{method}\n\n\n#{expire_date}\n/#{BUCKET}/#{path}"
-  hmac = OpenSSL::HMAC.digest(digest, AWS_SECRET_KEY, can_string)
-  sig = URI.escape(Base64.encode64(hmac).strip)
-  encoded_signature = SIGNS.inject(sig) {|s, kv| s.gsub(kv.first, kv.last) }
-
-  "https://s3.amazonaws.com/#{BUCKET}/#{path}" +
-    "?AWSAccessKeyId=#{AWS_ACCESS_KEY}&Expires=#{expire_date}" +
-    "&Signature=#{encoded_signature}"
+def signed_url(path, ttl, method = "GET")
+  expires = Time.now.to_i + ttl.to_i
+  string_to_sign = "#{method}\n\n\n#{expires}\n/#{BUCKET}/#{path}"
+  digest = OpenSSL::Digest::Digest.new("sha1")
+  hmac = OpenSSL::HMAC.digest(digest, AWS_SECRET_KEY, string_to_sign)
+  b64_hmac = [hmac].pack("m").strip
+  signature = CGI.escape(b64_hmac)
+  host_and_bucket = "#{BUCKET}.s3.amazonaws.com"
+  "http://#{host_and_bucket}/#{path}?AWSAccessKeyId=#{AWS_ACCESS_KEY}" +
+    "&Signature=#{signature}&Expires=#{expires}"
 end
 
 abort "USAGE: $0 APP_NAME BUILDPACK_URL" if(ARGV.size != 2)
@@ -30,13 +25,13 @@ abort "USAGE: $0 APP_NAME BUILDPACK_URL" if(ARGV.size != 2)
 app_name, buildpack_url = ARGV
 
 compile_id = rand(2**64).to_s(36) # poor man's UUID
-expire_at = Time.now.to_i + 60*60
+ttl = 60*60
 
-repo_url = signed_url("/repos/#{app_name}.bundle", expire_at)
-repo_put_url = signed_url("/repos/#{app_name}.bundle", expire_at, "PUT")
+repo_url = signed_url("repos/#{app_name}.bundle", ttl, "GET")
+repo_put_url = signed_url("repos/#{app_name}.bundle", ttl, "PUT")
 
-slug_url = signed_url("/slugs/#{compile_id}", expire_at)
-slug_put_url = signed_url("/slugs/#{compile_id}", expire_at, "PUT")
+slug_url = signed_url("slugs/#{compile_id}", ttl, "GET")
+slug_put_url = signed_url("slugs/#{compile_id}", ttl, "PUT")
 
 user = `heroku auth:whoami`.strip
 token = `heroku auth:token`.strip
