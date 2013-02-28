@@ -26,7 +26,7 @@ module Sokoban
        ["GET", :get_idx_file,     /(.*?)\/objects\/pack\/pack-[0-9a-f]{40}\\.idx$/],
       ]
 
-    def initialize(repo_url, user, app_name, buildpack_url,
+    def initialize(repo_url, user, token, app_name, buildpack_url,
                    slug_put_url, slug_url, repo_put_url)
       Scrolls.global_context(app: "sokoban", receiver: true)
       bundle = File.join("/tmp", "repo.bundle")
@@ -49,7 +49,7 @@ module Sokoban
         File.delete(bundle)
       end
 
-      install_hooks(user, app_name, buildpack_url,
+      install_hooks(user, token, app_name, buildpack_url,
                     slug_put_url, slug_url, repo_put_url)
 
       # TODO: do the right thing here
@@ -58,7 +58,7 @@ module Sokoban
       puts("Started on #{host}:#{ENV['PORT']}")
     end
 
-    def install_hooks(user, app_name, buildpack_url,
+    def install_hooks(user, token, app_name, buildpack_url,
                       slug_put_url, slug_url, repo_put_url)
       log(action: "install-hooks") do
         hooks_dir = File.join(@repo_dir, "hooks")
@@ -68,7 +68,7 @@ module Sokoban
 
         File.open(File.join(hooks_dir, "post-receive"), "w") do |f|
           f.puts("ruby -I #{$LOAD_PATH.join(':')} #{sokoban} post_receive_hook " \
-                 "'#{user}' '#{app_name}' '#{buildpack_url}' " \
+                 "'#{user}' '#{token}' '#{app_name}' '#{buildpack_url}' " \
                  "'#{slug_put_url}' '#{slug_url}' '#{repo_put_url}'")
         end
 

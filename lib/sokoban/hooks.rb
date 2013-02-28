@@ -6,7 +6,7 @@ require "tempfile"
 module Sokoban
   module_function
 
-  def post_receive(user, app_name, buildpack_url,
+  def post_receive(user, token, app_name, buildpack_url,
                    slug_put_url=nil, slug_url=nil, repo_put_url=nil)
     if STDIN.read.split("\n").grep(/\s+refs\/heads\/master$/).empty?
       puts "Pushed to non-master branch, skipping build."
@@ -20,7 +20,7 @@ module Sokoban
 
       system("git", "clone", Dir.pwd, build_dir,
              [:out, :err] => "/dev/null")
-      # TODO: appears to be running on the prior revision
+
       slug, dyno_types = SlugCompiler.run(build_dir, buildpack_url,
                                           cache_dir, output_dir)
 
@@ -29,11 +29,11 @@ module Sokoban
         put_slug(slug, slug_put_url)
         # V2 releases
         repo_size = `du -s -x #{Dir.pwd}`.split(" ").first.to_i*1024
-        release_name = post_release_v2(app_name, slug, dyno_types, user,
+        release_name = post_release_v2(app_name, slug, dyno_types, user, token,
                                        slug_url, repo_size)
         # V3 releases
         # params = release_params(slug, dyno_types, user, slug_url)
-        # release_name = post_release(app_name, params)
+        # release_name = post_release(user, token, app_name, params)
         puts("       ...done, #{release_name}.")
         puts("       http://#{app_name}.herokuapp.com deployed to Heroku\n")
       end
@@ -54,9 +54,9 @@ module Sokoban
     end
   end
 
-  def post_release(app_name, params)
+  def post_release(user, token, app_name, params)
     Timeout.timeout((ENV["POST_RELEASE_TIMEOUT"] || 30).to_i) do
-      response = release_request(app_name, params)
+      response = release_request(user, token, app_name, params)
       unless (response.code =~ /^2/)
         error_message = begin
                           response.body && JSON.parse(response.body)["error"] \
@@ -85,11 +85,11 @@ module Sokoban
     }
   end
 
-  def release_request(app_name, params)
+  def release_request(user, token, app_name, params)
     uri = release_uri(app_name)
     Net::HTTP.start(uri.host, uri.port) do |http|
       request = Net::HTTP::Post.new(uri.request_uri)
-      request.basic_auth(uri.user, uri.password)
+      request.basic_auth(user, token)
       request["Content-Type"] = "application/json"
       request["Accept"] = "application/vnd.heroku+json; version=3"
       request.body = JSON.unparse(params)
@@ -113,8 +113,8 @@ module Sokoban
 
   # The above is designed to work against the v3 releases API, which
   # doesn't exist yet! So here's some stuff that works with v2:
-  def post_release_v2(app_name, slug, dyno_types, user, slug_url, repo_size)
-    slug_url_regex = /https:\/\/s3.amazonaws.com\/(.+?)\/(.+?)\?/
+  def post_release_v2(app_name, slug, dyno_types, user, token,
+                      slug_url, repo_size)
     _, slug_put_key, slug_put_bucket = slug_url.match(slug_url_regex).to_a
     start = Time.now
     payload = {
@@ -146,7 +146,7 @@ module Sokoban
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
-      request.basic_auth(uri.user, uri.password)
+      request.basic_auth(user, token)
       request["Content-Type"] = "application/json"
       request["Accept"] = "application/json"
       request.body = JSON.unparse(payload)
